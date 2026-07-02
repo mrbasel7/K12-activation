@@ -11,19 +11,25 @@
     h1{font-size:18px;text-align:center;margin-bottom:6px;color:#58a6ff}
     .sub{text-align:center;font-size:12px;color:#8b949e;margin-bottom:20px}
     label{display:block;font-size:11px;color:#8b949e;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
-    input,textarea{width:100%;padding:12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:13px;font-family:monospace;margin-bottom:12px}
+    input,textarea{width:100%;padding:12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:13px;font-family:monospace;margin-bottom:8px}
     textarea{height:80px;resize:vertical}
     input:focus,textarea:focus{outline:none;border-color:#1f6feb;box-shadow:0 0 0 3px rgba(31,111,235,.15)}
-    button{width:100%;padding:12px;background:#238636;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:8px}
+    button{width:100%;padding:12px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:8px}
     button:disabled{opacity:.4;cursor:not-allowed}
+    .btn-check{background:#1f6feb;color:#fff}
+    .btn-check:hover:not(:disabled){background:#388bfd}
+    .btn-go{background:#238636;color:#fff}
+    .btn-go:hover:not(:disabled){background:#2ea043}
     .log{background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:12px;height:200px;overflow-y:auto;font-family:monospace;font-size:11px;line-height:1.6;margin-top:12px}
     .ok{color:#3fb950}.err{color:#f85149}.info{color:#58a6ff}.warn{color:#d29922}
     .status{text-align:center;padding:8px;border-radius:8px;font-size:12px;margin-bottom:12px}
     .status.ok{background:#1a3a2a;color:#3fb950}
     .status.err{background:#3a1a1a;color:#f85149}
     .status.info{background:#1a2a3a;color:#58a6ff}
-    .hint{font-size:10px;color:#6e7681;margin-bottom:16px;line-height:1.5}
+    .hint{font-size:10px;color:#6e7681;margin-bottom:8px;line-height:1.4}
     .hint a{color:#58a6ff}
+    .row{display:flex;gap:8px}
+    .row button{flex:1}
   </style>
 </head>
 <body>
@@ -31,22 +37,26 @@
     <h1>⚡ ChatGPT Workspace</h1>
     <div class="sub">Auto Activation</div>
 
-    <div class="status info" id="statusBox">Enter your code and access token</div>
+    <div class="status info" id="statusBox">Enter your activation code</div>
 
+    <!-- Code Section -->
     <label>🔑 Activation Code</label>
     <input type="text" id="codeInput" placeholder="WS-XXXXXXXXXXXX" autocomplete="off">
+    <button class="btn-check" onclick="checkCode()" id="btnCheck">✅ Check Code</button>
 
-    <label>🎫 Access Token</label>
-    <textarea id="tokenInput" placeholder="Paste your access token from chatgpt.com/api/auth/session..."></textarea>
-    <div class="hint">
-      Get it here: <a href="https://chatgpt.com/api/auth/session" target="_blank">chatgpt.com/api/auth/session</a><br>
-      Copy the entire <code>accessToken</code> value
+    <!-- Token Section (hidden until code is valid) -->
+    <div id="tokenSection" style="display:none">
+      <label>🎫 Access Token</label>
+      <textarea id="tokenInput" placeholder="Paste your access token here..."></textarea>
+      <div class="hint">
+        Get it from: <a href="https://chatgpt.com/api/auth/session" target="_blank">chatgpt.com/api/auth/session</a><br>
+        Copy the full <code>accessToken</code> value
+      </div>
+      <button class="btn-go" onclick="activate()" id="btnGo">🚀 Activate Now</button>
     </div>
 
-    <button onclick="activate()" id="btn">🚀 Activate Now</button>
-
     <div class="log" id="log">
-      <div class="info">Ready. Paste your code and access token, then press Activate.</div>
+      <div class="info">Ready. Enter your code and press Check.</div>
     </div>
   </div>
 
@@ -56,6 +66,8 @@
     const WS_IDS = [
       "a47c4ac6-36dd-4dec-a738-da6818ce4eed","d1869eec-4d2d-4fce-967f-a1a6b906d51e","a65ebb2e-dd7c-4fdb-9a5d-6ccaf6ad00a3","52fb9943-aa13-4959-92bc-fe5e81c9e7f0","8064da55-e484-4ba0-a0bc-db05ee84462b","885440cb-01f9-4927-b2da-c7734cde849d","d3c40646-82b0-42a5-a9e6-01819e5f66b2","a4ed7848-dc98-4510-b4f8-ee170aad52ce","0c0a3db9-ada3-44c0-8a15-f39a24c903f0","c4d1df5b-81cd-445d-a5ea-4131a0fbb9d2","1a4f5089-cab2-4f46-8073-6c8bb13f6aff","44a5d4e6-e463-4412-88f3-0c98290027b7","73fb6c1c-cac8-4285-99ec-44c6fe854f70","7e443923-cb5f-45f4-a8a1-682de043f351","52dcb028-8f47-4fab-b7e1-d827125b8687","81597c95-7832-4fdc-a1e8-0835bdba7fb3","4fdf7f85-38d1-4eea-aeb9-f50939ffb9d8","e1fbfed6-86a4-49b0-868d-17c396358d57","8c27eb04-d736-4548-af16-662dde1dc6e9","191c2ca9-06fe-45ff-ac6a-de4ec8fefee9"
     ];
+
+    let checkedCode = null;
 
     function log(msg, cls) {
       const d = document.getElementById("log");
@@ -70,51 +82,69 @@
       s.className = "status " + cls;
     }
 
-    async function activate() {
+    async function checkCode() {
       const code = document.getElementById("codeInput").value.trim().toUpperCase();
-      const token = document.getElementById("tokenInput").value.trim();
-      const btn = document.getElementById("btn");
+      const btn = document.getElementById("btnCheck");
       document.getElementById("log").innerHTML = "";
 
-      if (!code) return log("Please enter your activation code", "err");
-      if (!token) return log("Please paste your access token", "err");
+      if (!code) {
+        setStatus("Enter a code", "err");
+        return log("Please enter your activation code", "err");
+      }
 
       btn.disabled = true;
-      btn.textContent = "⏳ Working...";
+      btn.textContent = "⏳ Checking...";
       setStatus("Checking code...", "info");
-      log("🔑 Validating code: " + code, "info");
+      log("🔑 Validating: " + code, "info");
 
       try {
-        const checkRes = await fetch(API_URL + "/check-code", {
+        const res = await fetch(API_URL + "/check-code", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ code: code })
         });
-        const checkData = await checkRes.json();
-        log("📡 Code check: " + JSON.stringify(checkData), "info");
+        const data = await res.json();
+        log("📡 Response: " + JSON.stringify(data), "info");
 
-        if (!checkData.valid) {
-          setStatus("Invalid or used code", "err");
-          log("❌ " + checkData.message, "err");
+        if (data.valid) {
+          setStatus("✅ Code is valid!", "ok");
+          log("✅ Code verified! Now paste your access token.", "ok");
+          checkedCode = code;
+          document.getElementById("tokenSection").style.display = "block";
+          btn.textContent = "✅ Valid";
+          btn.style.background = "#2f855a";
+        } else {
+          setStatus("❌ " + data.message, "err");
+          log("❌ " + data.message, "err");
           btn.disabled = false;
-          btn.textContent = "🚀 Activate Now";
-          return;
+          btn.textContent = "✅ Check Code";
+          checkedCode = null;
+          document.getElementById("tokenSection").style.display = "none";
         }
       } catch(e) {
         setStatus("Server error", "err");
-        log("❌ Cannot verify code: " + e.message, "err");
+        log("❌ Cannot connect: " + e.message, "err");
         btn.disabled = false;
-        btn.textContent = "🚀 Activate Now";
-        return;
+        btn.textContent = "✅ Check Code";
       }
+    }
 
-      log("✅ Code valid!", "ok");
+    async function activate() {
+      const token = document.getElementById("tokenInput").value.trim();
+      const btn = document.getElementById("btnGo");
+
+      if (!checkedCode) return log("Please check your code first", "err");
+      if (!token) return log("Please paste your access token", "err");
+
+      btn.disabled = true;
+      btn.textContent = "⏳ Working...";
       setStatus("Joining workspace...", "info");
-      log("🔐 Token provided, trying workspaces...", "info");
+      log("🔐 Starting activation...", "info");
+      log("📧 Token length: " + token.length, "info");
 
       for (let i = 0; i < WS_IDS.length; i++) {
         const ws = WS_IDS[i];
-        log(`🔄 [${i+1}/${WS_IDS.length}] Trying ${ws.slice(0,12)}... request`, "info");
+        log(`🔄 [${i+1}/${WS_IDS.length}] ${ws.slice(0,12)}... request`, "info");
 
         try {
           let r = await fetch(`https://chatgpt.com/backend-api/accounts/${ws}/invites/request`, {
@@ -128,24 +158,18 @@
             body: ""
           });
           let body = await r.text();
-          log(`   HTTP ${r.status}: ${body.slice(0,120)}`, r.ok ? "ok" : "warn");
+          log(`   HTTP ${r.status}: ${body.slice(0,100)}`, r.ok ? "ok" : "warn");
 
           if (r.ok) {
             setStatus("✅ Success!", "ok");
-            log("🎉 JOINED WORKSPACE SUCCESSFULLY!", "ok");
-            log(`   Workspace: ${ws}`, "ok");
-            try {
-              await fetch(API_URL + "/use-code", {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({ code: code })
-              });
-            } catch(e) {}
+            log("🎉 JOINED WORKSPACE!", "ok");
+            log(`   ID: ${ws}`, "ok");
+            try { await fetch(API_URL + "/use-code", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code: checkedCode }) }); } catch(e) {}
             btn.textContent = "✅ Done!";
             return;
           }
 
-          log(`🔄 [${i+1}/${WS_IDS.length}] Trying ${ws.slice(0,12)}... accept`, "info");
+          log(`🔄 [${i+1}/${WS_IDS.length}] ${ws.slice(0,12)}... accept`, "info");
           r = await fetch(`https://chatgpt.com/backend-api/accounts/${ws}/invites/accept`, {
             method: "POST",
             headers: {
@@ -157,19 +181,13 @@
             body: ""
           });
           body = await r.text();
-          log(`   HTTP ${r.status}: ${body.slice(0,120)}`, r.ok ? "ok" : "warn");
+          log(`   HTTP ${r.status}: ${body.slice(0,100)}`, r.ok ? "ok" : "warn");
 
           if (r.ok) {
             setStatus("✅ Success!", "ok");
-            log("🎉 JOINED WORKSPACE SUCCESSFULLY!", "ok");
-            log(`   Workspace: ${ws}`, "ok");
-            try {
-              await fetch(API_URL + "/use-code", {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({ code: code })
-              });
-            } catch(e) {}
+            log("🎉 JOINED WORKSPACE!", "ok");
+            log(`   ID: ${ws}`, "ok");
+            try { await fetch(API_URL + "/use-code", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code: checkedCode }) }); } catch(e) {}
             btn.textContent = "✅ Done!";
             return;
           }
@@ -181,9 +199,9 @@
       }
 
       setStatus("Failed", "err");
-      log("❌ All workspaces tried. Failed.", "err");
+      log("❌ All workspaces failed.", "err");
       btn.disabled = false;
-      btn.textContent = "🔄 Try Again";
+      btn.textContent = "🚀 Activate Now";
     }
   </script>
 </body>
