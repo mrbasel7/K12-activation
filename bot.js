@@ -3,8 +3,8 @@ const Database = require("better-sqlite3");
 const crypto = require("crypto");
 
 // ==================== غير السطرين دول ====================
-const BOT_TOKEN = "حط_توكن_البوت_هنا";
-const ADMIN_IDS = ["حط_رقم_تليجرام_بتاعك_هنا"];
+const BOT_TOKEN = "8681773635:AAGF5EUAdoD-LBacPeUp2o3Be8YWdQlNxI4";
+const ADMIN_IDS = ["7469507752"];
 // =========================================================
 
 const WORKSPACE_IDS = [
