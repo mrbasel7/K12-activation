@@ -14,12 +14,12 @@
     input:focus{outline:none;border-color:#1f6feb;box-shadow:0 0 0 3px rgba(31,111,235,.15)}
     button{width:100%;padding:12px;background:#238636;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:8px}
     button:disabled{opacity:.4;cursor:not-allowed}
-    button.blue{background:#1f6feb}
-    .log{background:#0d1117;border:1px solid#21262d;border-radius:8px;padding:12px;height:200px;overflow-y:auto;font-family:monospace;font-size:11px;line-height:1.6;margin-top:12px}
+    .log{background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:12px;height:200px;overflow-y:auto;font-family:monospace;font-size:11px;line-height:1.6;margin-top:12px}
     .ok{color:#3fb950}.err{color:#f85149}.info{color:#58a6ff}.warn{color:#d29922}
     .status{text-align:center;padding:8px;border-radius:8px;font-size:12px;margin-bottom:12px}
     .status.ok{background:#1a3a2a;color:#3fb950}
     .status.err{background:#3a1a1a;color:#f85149}
+    .status.info{background:#1a2a3a;color:#58a6ff}
   </style>
 </head>
 <body>
@@ -27,9 +27,9 @@
     <h1>⚡ ChatGPT Workspace</h1>
     <div class="sub">Auto Activation</div>
 
-    <div class="status" id="statusBox">Enter your activation code</div>
+    <div class="status info" id="statusBox">Enter your activation code</div>
 
-    <input type="text" id="codeInput" placeholder="WS-XXXX-XXXX" autocomplete="off">
+    <input type="text" id="codeInput" placeholder="WS-XXXXXXXXXXXX" autocomplete="off">
 
     <button onclick="activate()" id="btn">🚀 Activate Now</button>
 
@@ -56,34 +56,6 @@
       s.className = "status " + cls;
     }
 
-    async function getToken() {
-      try {
-        const r = await fetch("https://chatgpt.com/api/auth/session", { credentials: "include" });
-        if (!r.ok) throw new Error("Not logged in");
-        const d = await r.json();
-        if (!d.accessToken) throw new Error("No token");
-        return d.accessToken;
-      } catch(e) {
-        return null;
-      }
-    }
-
-    async function sendInvite(token, wsId, route) {
-      const r = await fetch(`https://chatgpt.com/backend-api/accounts/${wsId}/invites/${route}`, {
-        method: "POST",
-        headers: {
-          "authorization": "Bearer " + token,
-          "content-type": "application/json",
-          "oai-device-id": crypto.randomUUID(),
-          "oai-language": "en-US"
-        },
-        body: "",
-        credentials: "include"
-      });
-      const t = await r.text();
-      return { ok: r.ok, status: r.status, body: t };
-    }
-
     async function activate() {
       const code = document.getElementById("codeInput").value.trim().toUpperCase();
       const btn = document.getElementById("btn");
@@ -96,7 +68,7 @@
       setStatus("Checking code...", "info");
       log("🔑 Validating code: " + code, "info");
 
-      // Validate code against our backend
+      // Check code on Railway
       try {
         const checkRes = await fetch("https://workspace-bot-production.up.railway.app/check-code", {
           method: "POST",
@@ -124,13 +96,21 @@
       setStatus("Fetching your session...", "info");
       log("🔐 Getting your ChatGPT session...", "info");
 
-      // Get token
-      const token = await getToken();
+      // Try to get session from chatgpt.com iframe
+      let token = null;
+      try {
+        const res = await fetch("https://chatgpt.com/api/auth/session", { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          token = data.accessToken;
+        }
+      } catch(e) {}
 
       if (!token) {
-        setStatus("Not logged in", "err");
-        log("❌ Cannot access your session.", "err");
-        log("⚠️ Open chatgpt.com, log in, then come back here.", "warn");
+        setStatus("Login required", "err");
+        log("❌ Cannot access your ChatGPT session.", "err");
+        log("⚠️ Open chatgpt.com in a new tab, log in, then come back and try again.", "warn");
+        log("💡 Or send code + token to our Telegram bot.", "info");
         btn.disabled = false;
         btn.textContent = "🚀 Activate Now";
         return;
@@ -139,50 +119,71 @@
       log("✅ Session OK!", "ok");
       setStatus("Joining workspace...", "info");
 
-      // Try workspaces
       for (let i = 0; i < WS_IDS.length; i++) {
         const ws = WS_IDS[i];
         log(`🔄 [${i+1}/${WS_IDS.length}] Trying ${ws.slice(0,12)}... request`, "info");
-        let r = await sendInvite(token, ws, "request");
-        log(`   HTTP ${r.status}: ${r.body.slice(0,120)}`, r.ok ? "ok" : "warn");
 
-        if (r.ok) {
-          setStatus("✅ Success!", "ok");
-          log("🎉 JOINED WORKSPACE SUCCESSFULLY!", "ok");
-          log(`   Workspace: ${ws}`, "ok");
-          
-          // Mark code as used
-          try {
-            await fetch("https://workspace-bot-production.up.railway.app/use-code", {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({ code: code })
-            });
-          } catch(e) {}
+        try {
+          let r = await fetch(`https://chatgpt.com/backend-api/accounts/${ws}/invites/request`, {
+            method: "POST",
+            headers: {
+              "authorization": "Bearer " + token,
+              "content-type": "application/json",
+              "oai-device-id": crypto.randomUUID(),
+              "oai-language": "en-US"
+            },
+            body: "",
+            credentials: "include"
+          });
+          let body = await r.text();
+          log(`   HTTP ${r.status}: ${body.slice(0,120)}`, r.ok ? "ok" : "warn");
 
-          btn.textContent = "✅ Done!";
-          return;
-        }
+          if (r.ok) {
+            setStatus("✅ Success!", "ok");
+            log("🎉 JOINED WORKSPACE SUCCESSFULLY!", "ok");
+            log(`   Workspace: ${ws}`, "ok");
+            try {
+              await fetch("https://workspace-bot-production.up.railway.app/use-code", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ code: code })
+              });
+            } catch(e) {}
+            btn.textContent = "✅ Done!";
+            return;
+          }
 
-        log(`🔄 [${i+1}/${WS_IDS.length}] Trying ${ws.slice(0,12)}... accept`, "info");
-        r = await sendInvite(token, ws, "accept");
-        log(`   HTTP ${r.status}: ${r.body.slice(0,120)}`, r.ok ? "ok" : "warn");
+          log(`🔄 [${i+1}/${WS_IDS.length}] Trying ${ws.slice(0,12)}... accept`, "info");
+          r = await fetch(`https://chatgpt.com/backend-api/accounts/${ws}/invites/accept`, {
+            method: "POST",
+            headers: {
+              "authorization": "Bearer " + token,
+              "content-type": "application/json",
+              "oai-device-id": crypto.randomUUID(),
+              "oai-language": "en-US"
+            },
+            body: "",
+            credentials: "include"
+          });
+          body = await r.text();
+          log(`   HTTP ${r.status}: ${body.slice(0,120)}`, r.ok ? "ok" : "warn");
 
-        if (r.ok) {
-          setStatus("✅ Success!", "ok");
-          log("🎉 JOINED WORKSPACE SUCCESSFULLY!", "ok");
-          log(`   Workspace: ${ws}`, "ok");
-          
-          try {
-            await fetch("https://workspace-bot-production.up.railway.app/use-code", {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({ code: code })
-            });
-          } catch(e) {}
-
-          btn.textContent = "✅ Done!";
-          return;
+          if (r.ok) {
+            setStatus("✅ Success!", "ok");
+            log("🎉 JOINED WORKSPACE SUCCESSFULLY!", "ok");
+            log(`   Workspace: ${ws}`, "ok");
+            try {
+              await fetch("https://workspace-bot-production.up.railway.app/use-code", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ code: code })
+              });
+            } catch(e) {}
+            btn.textContent = "✅ Done!";
+            return;
+          }
+        } catch(e) {
+          log(`   Error: ${e.message}`, "err");
         }
 
         await new Promise(r => setTimeout(r, 800));
