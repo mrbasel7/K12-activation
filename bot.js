@@ -1,6 +1,7 @@
 const TelegramBot = require("node-telegram-bot-api");
 const Database = require("better-sqlite3");
 const crypto = require("crypto");
+const express = require("express");
 
 // ==================== غير السطرين دول ====================
 const BOT_TOKEN = "8681773635:AAGF5EUAdoD-LBacPeUp2o3Be8YWdQlNxI4";
@@ -221,8 +222,8 @@ bot.onText(/\/sendcode (\d+) (.+)/, (msg, match) => {
   bot.sendMessage(targetUserId,
     `🎁 *Your activation code has arrived!*\n\n` +
     `📟 Code: \`${code}\`\n\n` +
-    `📝 *To activate:* send the code + Access Token like this:\n` +
-    `\`${code} eyJhbGciOi...\``,
+    `🌐 Activate here: https://YOUR_USERNAME.github.io/workspace-bot/\n\n` +
+    `📝 *To activate:* Open the link, paste your code, and press Activate.`,
     { parse_mode: "Markdown" }
   ).then(() => {
     bot.sendMessage(chatId, `✅ Code sent to user ${targetUserId}`);
@@ -245,7 +246,8 @@ bot.onText(/\/start/, (msg) => {
     `2. Open https://chatgpt.com/api/auth/session\n` +
     `3. Copy the entire \`accessToken\` value\n` +
     `4. Send it here with your code\n\n` +
-    `📟 Example: \`WS-ABC123 eyJhbGciOi...\``,
+    `📟 Example: \`WS-ABC123 eyJhbGciOi...\`\n\n` +
+    `🌐 *Or use our web activator:* https://YOUR_USERNAME.github.io/workspace-bot/`,
     { parse_mode: "Markdown" }
   );
 });
@@ -479,6 +481,33 @@ bot.onText(/\/status/, (msg) => {
   bot.sendMessage(chatId, `🟢 *Bot is online and ready to process activations*`, {
     parse_mode: "Markdown",
   });
+});
+
+// ==================== API for web page ====================
+const app = express();
+app.use(express.json());
+
+app.post("/check-code", (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.json({ valid: false, message: "No code provided" });
+
+  const record = db.prepare("SELECT * FROM codes WHERE code = ?").get(code.toUpperCase());
+  if (!record) return res.json({ valid: false, message: "Code not found" });
+  if (record.is_used) return res.json({ valid: false, message: "Code already used" });
+
+  return res.json({ valid: true, message: "Code is valid" });
+});
+
+app.post("/use-code", (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.json({ ok: false });
+
+  db.prepare("UPDATE codes SET is_used = 1, used_by = 'web', used_at = datetime('now') WHERE code = ?").run(code.toUpperCase());
+  return res.json({ ok: true });
+});
+
+app.listen(process.env.PORT || 3000, () => {
+  console.log("API server running on port " + (process.env.PORT || 3000));
 });
 
 console.log("✅ Bot is running...");
