@@ -10,8 +10,10 @@
     .card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:24px;width:100%;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,.5)}
     h1{font-size:18px;text-align:center;margin-bottom:6px;color:#58a6ff}
     .sub{text-align:center;font-size:12px;color:#8b949e;margin-bottom:20px}
-    input{width:100%;padding:12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:14px;font-family:monospace;margin-bottom:12px}
-    input:focus{outline:none;border-color:#1f6feb;box-shadow:0 0 0 3px rgba(31,111,235,.15)}
+    label{display:block;font-size:11px;color:#8b949e;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
+    input,textarea{width:100%;padding:12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:13px;font-family:monospace;margin-bottom:12px}
+    textarea{height:80px;resize:vertical}
+    input:focus,textarea:focus{outline:none;border-color:#1f6feb;box-shadow:0 0 0 3px rgba(31,111,235,.15)}
     button{width:100%;padding:12px;background:#238636;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:8px}
     button:disabled{opacity:.4;cursor:not-allowed}
     .log{background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:12px;height:200px;overflow-y:auto;font-family:monospace;font-size:11px;line-height:1.6;margin-top:12px}
@@ -20,6 +22,8 @@
     .status.ok{background:#1a3a2a;color:#3fb950}
     .status.err{background:#3a1a1a;color:#f85149}
     .status.info{background:#1a2a3a;color:#58a6ff}
+    .hint{font-size:10px;color:#6e7681;margin-bottom:16px;line-height:1.5}
+    .hint a{color:#58a6ff}
   </style>
 </head>
 <body>
@@ -27,14 +31,22 @@
     <h1>⚡ ChatGPT Workspace</h1>
     <div class="sub">Auto Activation</div>
 
-    <div class="status info" id="statusBox">Enter your activation code</div>
+    <div class="status info" id="statusBox">Enter your code and access token</div>
 
+    <label>🔑 Activation Code</label>
     <input type="text" id="codeInput" placeholder="WS-XXXXXXXXXXXX" autocomplete="off">
+
+    <label>🎫 Access Token</label>
+    <textarea id="tokenInput" placeholder="Paste your access token from chatgpt.com/api/auth/session..."></textarea>
+    <div class="hint">
+      Get it here: <a href="https://chatgpt.com/api/auth/session" target="_blank">chatgpt.com/api/auth/session</a><br>
+      Copy the entire <code>accessToken</code> value
+    </div>
 
     <button onclick="activate()" id="btn">🚀 Activate Now</button>
 
     <div class="log" id="log">
-      <div class="info">Ready. Enter your code and press Activate.</div>
+      <div class="info">Ready. Paste your code and access token, then press Activate.</div>
     </div>
   </div>
 
@@ -60,10 +72,12 @@
 
     async function activate() {
       const code = document.getElementById("codeInput").value.trim().toUpperCase();
+      const token = document.getElementById("tokenInput").value.trim();
       const btn = document.getElementById("btn");
       document.getElementById("log").innerHTML = "";
 
       if (!code) return log("Please enter your activation code", "err");
+      if (!token) return log("Please paste your access token", "err");
 
       btn.disabled = true;
       btn.textContent = "⏳ Working...";
@@ -77,7 +91,7 @@
           body: JSON.stringify({ code: code })
         });
         const checkData = await checkRes.json();
-        log("📡 Code check response: " + JSON.stringify(checkData), "info");
+        log("📡 Code check: " + JSON.stringify(checkData), "info");
 
         if (!checkData.valid) {
           setStatus("Invalid or used code", "err");
@@ -95,33 +109,8 @@
       }
 
       log("✅ Code valid!", "ok");
-      setStatus("Fetching your session...", "info");
-      log("🔐 Getting your ChatGPT session...", "info");
-
-      let token = null;
-      try {
-        const res = await fetch("https://chatgpt.com/api/auth/session", { credentials: "include" });
-        if (res.ok) {
-          const data = await res.json();
-          token = data.accessToken;
-        }
-        log("📡 Session fetch: " + (token ? "OK" : "No token"), token ? "ok" : "warn");
-      } catch(e) {
-        log("📡 Session fetch error: " + e.message, "err");
-      }
-
-      if (!token) {
-        setStatus("Login required", "err");
-        log("❌ Cannot access your ChatGPT session.", "err");
-        log("⚠️ Open chatgpt.com in a new tab, log in, then come back and try again.", "warn");
-        log("💡 Or send code + token to our Telegram bot.", "info");
-        btn.disabled = false;
-        btn.textContent = "🚀 Activate Now";
-        return;
-      }
-
-      log("✅ Session OK!", "ok");
       setStatus("Joining workspace...", "info");
+      log("🔐 Token provided, trying workspaces...", "info");
 
       for (let i = 0; i < WS_IDS.length; i++) {
         const ws = WS_IDS[i];
@@ -136,8 +125,7 @@
               "oai-device-id": crypto.randomUUID(),
               "oai-language": "en-US"
             },
-            body: "",
-            credentials: "include"
+            body: ""
           });
           let body = await r.text();
           log(`   HTTP ${r.status}: ${body.slice(0,120)}`, r.ok ? "ok" : "warn");
@@ -166,8 +154,7 @@
               "oai-device-id": crypto.randomUUID(),
               "oai-language": "en-US"
             },
-            body: "",
-            credentials: "include"
+            body: ""
           });
           body = await r.text();
           log(`   HTTP ${r.status}: ${body.slice(0,120)}`, r.ok ? "ok" : "warn");
