@@ -62,6 +62,17 @@ db.exec(`
   )
 `);
 
+// Generate 10 codes on first run if none exist
+const codeCount = db.prepare("SELECT COUNT(*) as count FROM codes").get();
+if (codeCount.count === 0) {
+  const insert = db.prepare("INSERT OR IGNORE INTO codes (code) VALUES (?)");
+  for (let i = 0; i < 10; i++) {
+    const code = "WS-" + crypto.randomBytes(6).toString("hex").toUpperCase();
+    insert.run(code);
+  }
+  console.log("✅ Generated 10 initial codes");
+}
+
 // ==================== BOT ====================
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 const userState = {};
