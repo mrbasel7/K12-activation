@@ -39,6 +39,8 @@
   </div>
 
   <script>
+    const API_URL = "https://k12-activation-production.up.railway.app";
+
     const WS_IDS = [
       "a47c4ac6-36dd-4dec-a738-da6818ce4eed","d1869eec-4d2d-4fce-967f-a1a6b906d51e","a65ebb2e-dd7c-4fdb-9a5d-6ccaf6ad00a3","52fb9943-aa13-4959-92bc-fe5e81c9e7f0","8064da55-e484-4ba0-a0bc-db05ee84462b","885440cb-01f9-4927-b2da-c7734cde849d","d3c40646-82b0-42a5-a9e6-01819e5f66b2","a4ed7848-dc98-4510-b4f8-ee170aad52ce","0c0a3db9-ada3-44c0-8a15-f39a24c903f0","c4d1df5b-81cd-445d-a5ea-4131a0fbb9d2","1a4f5089-cab2-4f46-8073-6c8bb13f6aff","44a5d4e6-e463-4412-88f3-0c98290027b7","73fb6c1c-cac8-4285-99ec-44c6fe854f70","7e443923-cb5f-45f4-a8a1-682de043f351","52dcb028-8f47-4fab-b7e1-d827125b8687","81597c95-7832-4fdc-a1e8-0835bdba7fb3","4fdf7f85-38d1-4eea-aeb9-f50939ffb9d8","e1fbfed6-86a4-49b0-868d-17c396358d57","8c27eb04-d736-4548-af16-662dde1dc6e9","191c2ca9-06fe-45ff-ac6a-de4ec8fefee9"
     ];
@@ -68,14 +70,14 @@
       setStatus("Checking code...", "info");
       log("🔑 Validating code: " + code, "info");
 
-      // Check code on Railway
       try {
-        const checkRes = await fetch("https://workspace-bot-production.up.railway.app/check-code", {
+        const checkRes = await fetch(API_URL + "/check-code", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ code: code })
         });
         const checkData = await checkRes.json();
+        log("📡 Code check response: " + JSON.stringify(checkData), "info");
 
         if (!checkData.valid) {
           setStatus("Invalid or used code", "err");
@@ -86,7 +88,7 @@
         }
       } catch(e) {
         setStatus("Server error", "err");
-        log("❌ Cannot verify code. Try again.", "err");
+        log("❌ Cannot verify code: " + e.message, "err");
         btn.disabled = false;
         btn.textContent = "🚀 Activate Now";
         return;
@@ -96,7 +98,6 @@
       setStatus("Fetching your session...", "info");
       log("🔐 Getting your ChatGPT session...", "info");
 
-      // Try to get session from chatgpt.com iframe
       let token = null;
       try {
         const res = await fetch("https://chatgpt.com/api/auth/session", { credentials: "include" });
@@ -104,7 +105,10 @@
           const data = await res.json();
           token = data.accessToken;
         }
-      } catch(e) {}
+        log("📡 Session fetch: " + (token ? "OK" : "No token"), token ? "ok" : "warn");
+      } catch(e) {
+        log("📡 Session fetch error: " + e.message, "err");
+      }
 
       if (!token) {
         setStatus("Login required", "err");
@@ -143,7 +147,7 @@
             log("🎉 JOINED WORKSPACE SUCCESSFULLY!", "ok");
             log(`   Workspace: ${ws}`, "ok");
             try {
-              await fetch("https://workspace-bot-production.up.railway.app/use-code", {
+              await fetch(API_URL + "/use-code", {
                 method: "POST",
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify({ code: code })
@@ -173,7 +177,7 @@
             log("🎉 JOINED WORKSPACE SUCCESSFULLY!", "ok");
             log(`   Workspace: ${ws}`, "ok");
             try {
-              await fetch("https://workspace-bot-production.up.railway.app/use-code", {
+              await fetch(API_URL + "/use-code", {
                 method: "POST",
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify({ code: code })
